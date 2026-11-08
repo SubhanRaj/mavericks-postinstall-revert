@@ -14,6 +14,9 @@
 #   "Install OS X Mavericks.app", an InstallESD.dmg / BaseSystem.dmg file, or a
 #   folder you copied off the installer that holds the *.lproj/default.plist
 #   files (the Dock.app/Contents/Resources folder, or Dock.app itself).
+#   If the installer's base system has no Dock.app, the script unpacks the
+#   plists from System/Installation/Packages/Essentials.pkg on that volume,
+#   which takes a few minutes and about 3 GB of free disk space.
 #
 #   Without an argument the script looks through /Volumes, then asks you at the
 #   start. At that prompt you can paste or drag in the path, press Return to
@@ -102,11 +105,77 @@ try_root() {
   SRC_RES="$r"
 }
 
+# Unpack the Dock plists from Essentials.pkg. The installer's base system does
+# not always carry Dock.app, but this package does. On success SRC_RES is a
+# folder in your home directory that holds just the plists, so a later run can
+# use that folder and skip this step.
+pkg_extract() {
+  local pkg="$1" out="$WORK/pkgroot" x="$WORK/xar" r d f payload=""
+  local saved="$HOME/dockplists-from-installer"
+  local pattern='*Dock.app/Contents/Resources/*default.plist'
+  local free_kb
+
+  say "Reading $(basename "$pkg"). It unpacks a large file and can take several minutes."
+
+  free_kb=$(df -k "$WORK" | awk 'NR==2{print $4}')
+  if [ -n "$free_kb" ] && [ "$free_kb" -lt 3000000 ]; then
+    say "Not enough free disk space to unpack it (about 3 GB needed)."
+    return 1
+  fi
+
+  rm -rf "$out" "$x"
+  mkdir -p "$out" "$x"
+  if [ -d "$pkg" ]; then
+    # Package folder: the archive sits inside it.
+    for f in "$pkg/Contents/Archive.pax.gz" "$pkg/Contents/Archive.pax.bz2" "$pkg/Contents/Archive.pax"; do
+      if [ -f "$f" ]; then payload="$f"; break; fi
+    done
+  else
+    # Flat package (a xar archive): pull out its Payload.
+    (cd "$x" && xar -xf "$pkg" Payload) >/dev/null 2>&1
+    [ -f "$x/Payload" ] && payload="$x/Payload"
+  fi
+  if [ -z "$payload" ]; then
+    say "Could not read the payload from $(basename "$pkg")."
+    return 1
+  fi
+  if head -c 4 "$payload" | grep -q pbzx; then
+    say "$(basename "$pkg") uses the pbzx format, which this script cannot unpack."
+    rm -f "$x/Payload"
+    return 1
+  fi
+
+  # tar (bsdtar) detects both the compression and the cpio format.
+  (cd "$out" && tar --include "$pattern" -xf "$payload") >/dev/null 2>&1
+  r=$(find "$out" -type d -path '*Dock.app/Contents/Resources' 2>/dev/null | head -n 1)
+  if [ -z "$r" ]; then
+    (cd "$out" && { gzcat "$payload" 2>/dev/null || bzcat "$payload" 2>/dev/null; } \
+      | cpio -idm "$pattern") >/dev/null 2>&1
+    r=$(find "$out" -type d -path '*Dock.app/Contents/Resources' 2>/dev/null | head -n 1)
+  fi
+  rm -f "$x/Payload"
+
+  if [ -z "$r" ] || ! ls "$r"/*.lproj/default.plist >/dev/null 2>&1; then
+    say "No Dock plists found inside $(basename "$pkg")."
+    return 1
+  fi
+
+  rm -rf "$saved"
+  mkdir -p "$saved"
+  for d in "$r"/*.lproj; do
+    [ -f "$d/default.plist" ] || continue
+    mkdir -p "$saved/$(basename "$d")"
+    cp "$d/default.plist" "$saved/$(basename "$d")/"
+  done
+  SRC_RES="$saved"
+  say "Saved the plists to $saved. Pass that folder next time to skip this step."
+}
+
 # $1 is a mounted installer volume, an InstallESD volume, or a plain folder
 # holding the plists (a copied Dock.app, its Resources folder, or the
 # *.lproj folders themselves).
 find_from_dir() {
-  local d="$1" r
+  local d="$1" r p
   try_root "$d" && return 0
   if [ -f "$d/BaseSystem.dmg" ] && attach_dmg "$d/BaseSystem.dmg"; then
     try_root "$LAST_MP" && return 0
@@ -115,6 +184,11 @@ find_from_dir() {
     if ls "$r"/*.lproj/default.plist >/dev/null 2>&1; then
       SRC_RES="$r"
       return 0
+    fi
+  done
+  for p in "$d/System/Installation/Packages" "$d/Packages"; do
+    if [ -e "$p/Essentials.pkg" ]; then
+      pkg_extract "$p/Essentials.pkg" && return 0
     fi
   done
   return 1

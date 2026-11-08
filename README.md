@@ -27,6 +27,8 @@ At the start it asks where to copy Apple's original Dock layout from. Paste or d
 - `InstallESD.dmg` or `BaseSystem.dmg`
 - a folder you copied off the installer that holds the `*.lproj/default.plist` files (the `Dock.app/Contents/Resources` folder, or `Dock.app` itself)
 
+If the installer's base system has no `Dock.app`, the script unpacks the plists from `System/Installation/Packages/Essentials.pkg` on the same volume. That takes a few minutes and about 3 GB of free disk space. It saves the plists to `~/dockplists-from-installer`; pass that folder on a later run to skip the unpacking.
+
 Return skips the Dock step for now. Type `r` to use a rebuilt copy of the stock layout instead. To do the Dock step later, run the script again with the path:
 
 ```
