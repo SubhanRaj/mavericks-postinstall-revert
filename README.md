@@ -56,9 +56,20 @@ With Gatekeeper on, some newer apps may be refused on 10.9. Right-click the app 
 sudo xattr -dr com.apple.quarantine /Applications/AppName.app
 ```
 
+## Optional: install Office 2011
+
+`install-office-2011.command` downloads the Office for Mac 2011 installer from Microsoft's CDN and opens it in the normal macOS Installer. Run it the same way as the revert script (`chmod +x`, then double-click, or `bash install-office-2011.command`).
+
+- It only downloads from `officecdn-microsoft-com.akamaized.net`, the host Microsoft lists for Office for Mac installers in [Network requests in Office for Mac](https://learn.microsoft.com/en-us/microsoft-365/enterprise/network-requests-in-office-2016-for-mac). It stops if a redirect leads anywhere else, if the file is too small, or if `hdiutil verify` finds the image damaged.
+- It prints the SHA-256 of the download. To pin it: `EXPECTED_SHA256=<hash> bash install-office-2011.command`.
+- The download is resumable and stays in `~/Downloads/Office2011`.
+- If Microsoft no longer serves the file, the script says so and downloads nothing.
+
+It does not activate Office. Enter your own product key the first time you open an Office app. Microsoft's Volume License Serializer is for administrators with a volume agreement and covers Office LTSC 2021 and 2024 only, not Office 2011.
+
 ## Notes
 
-- Tested with stubbed commands on Linux, not on every Mavericks setup. Read the script before running it; it is a single file.
+- Tested with stubbed commands on Linux, not on every Mavericks setup. Read the scripts before running them; each is a single file.
 - The original script overwrote Apple's Dock layout files without a backup, which is why this one asks for the installer.
 
 ## License
