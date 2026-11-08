@@ -28,16 +28,16 @@
 #             and the Dock layout.
 # Left alone: the security patches, SMB and .DS_Store tweaks, media-key
 #             patches, font fix, classic wallpapers. Widgets, Maps and Game
-#             Center were deleted by the original script and cannot be
-#             restored from here.
+#             Center were deleted by the post-install script and are not
+#             restored.
 #
 # Optional:   REVERT_SHELL=1 bash revert-postinstall.command
 #             also removes the short Terminal prompt and case-insensitive tab
-#             completion the original script set up.
+#             completion the post-install script set up.
 #
-# Run as your normal user, not with sudo. The Dock goes back to the stock
-# layout and your current Dock preferences are copied to the backup folder
-# first.
+# Run as your normal user; the script exits if started with sudo. The Dock
+# goes back to the stock layout, and your current Dock preferences are copied
+# to the backup folder first.
 
 REVERT_SHELL=${REVERT_SHELL:-0}
 
@@ -47,7 +47,7 @@ if [ "$(uname)" != "Darwin" ]; then
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
-  echo "Run this as your normal user, not with sudo. It asks for your password itself."
+  echo "Run this as your normal user. The script asks for your password itself and does not run under sudo."
   exit 1
 fi
 
@@ -73,7 +73,7 @@ say() { echo "==> $*"; }
 udel() { defaults delete "$1" "$2" >/dev/null 2>&1; }
 # Delete a key in the new-user template. $1 is the plist name without .plist.
 tdel() { sudo defaults delete "$TEMPLATE/Library/Preferences/$1" "$2" >/dev/null 2>&1; }
-# Remove a file only if it still holds exactly what the original script wrote.
+# Remove a file only if it still holds exactly what the post-install script wrote.
 rm_if_exact() {
   if [ -f "$1" ] && [ "$(cat "$1")" = "$2" ]; then rm -f "$1"; fi
 }
@@ -278,7 +278,7 @@ sudo rm -f "$TEMPLATE/Library/LaunchAgents/show-library.plist"
 chflags hidden "$HOME/Library"
 sudo chflags hidden /usr
 
-# The original script set 775 here; the stock mode is 755.
+# Stock mode is 755 (the post-install script set 775).
 sudo chmod 755 /Applications/Utilities
 
 sudo defaults delete /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled >/dev/null 2>&1
@@ -316,7 +316,7 @@ restore_dock() {
       '<key>persistent-apps</key>' \
       '<array>'
     for app in "${DOCK_APPS[@]}"; do
-      # Skip anything not installed (Maps was removed by the original script).
+      # Skip anything not installed (the post-install script removed Maps).
       if [ -d "/Applications/$app.app" ]; then
         printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>/Applications/%s.app</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>\n' "$app"
       fi
@@ -341,7 +341,7 @@ restore_dock() {
 
   cp "$HOME/Library/Preferences/com.apple.dock.plist" "$BACKUP/" 2>/dev/null
 
-  # The original script overwrote default.plist in every language folder.
+  # The post-install script wrote its layout to default.plist in every language folder, so each one is replaced.
   for f in "$DOCK_RES"/*.lproj/default.plist; do
     [ -f "$f" ] || continue
     rel="${f#"$DOCK_RES"/}"

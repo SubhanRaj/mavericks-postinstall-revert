@@ -14,8 +14,8 @@
 #             hdiutil verify on the disk image, and prints its SHA-256. To also
 #             pin the checksum:  EXPECTED_SHA256=<hash> bash install-office-2011.command
 #
-# Run as your normal user, not with sudo. The macOS Installer asks for your
-# password itself.
+# Run as your normal user; the script exits if started with sudo. The macOS
+# Installer asks for your password itself.
 
 OFFICE_URL="https://officecdn-microsoft-com.akamaized.net/PR/MacOffice2011/en-us/MicrosoftOffice2011.dmg"
 DEST_DIR="$HOME/Downloads/Office2011"
@@ -37,7 +37,7 @@ cleanup() {
 trap cleanup EXIT
 
 [ "$(uname)" = "Darwin" ] || fail "This script is for OS X."
-[ "$(id -u)" -ne 0 ] || fail "Run this as your normal user, not with sudo."
+[ "$(id -u)" -ne 0 ] || fail "Run this as your normal user. The script does not run under sudo."
 
 # Only Microsoft's Office CDN hosts are accepted.
 host_of() { printf '%s' "$1" | sed -E 's#^[A-Za-z]+://([^/:]+).*#\1#'; }
