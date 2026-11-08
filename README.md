@@ -50,6 +50,51 @@ Optional: `REVERT_SHELL=1 bash revert-postinstall.command` also removes the shor
 
 Restart the Mac when it finishes.
 
+## Check that it worked
+
+Paste into Terminal. Each line prints `ok` when the setting is gone and `STILL SET` when it is not.
+
+```
+chk() { v=$(defaults read "$1" "$2" 2>/dev/null) && echo "STILL SET  $1 $2 = $v" || echo "ok         $1 $2"; }
+chk NSGlobalDomain NSDisableAutomaticTermination
+chk NSGlobalDomain NSDocumentSaveNewDocumentsToCloud
+chk NSGlobalDomain NSAutomaticSpellingCorrectionEnabled
+chk NSGlobalDomain WebAutomaticSpellingCorrectionEnabled
+chk com.apple.finder NewWindowTarget
+chk com.apple.finder NewWindowTargetPath
+chk com.apple.finder FXDefaultSearchScope
+chk com.apple.TimeMachine DoNotOfferNewDisksForBackup
+chk com.apple.Notes ShouldUseSmartLinks
+chk com.apple.Notes EnableAutomaticListInsertion
+```
+
+Gatekeeper, hidden folders, permissions, the HiDPI flag and the LaunchAgent:
+
+```
+spctl --status                      # expect: assessments enabled
+ls -ldO ~/Library /usr              # expect: "hidden" on both lines
+stat -f '%Lp' /Applications/Utilities   # expect: 755
+defaults read /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled   # expect: ... does not exist
+ls ~/Library/LaunchAgents/show-library.plist   # expect: No such file or directory
+```
+
+New-user template (a new account would start from these files):
+
+```
+T="/System/Library/User Template/Non_localized/Library"
+ls "$T/LaunchAgents/show-library.plist"   # expect: No such file or directory
+if sudo grep -la -E 'NSDisableAutomaticTermination|NSDocumentSaveNewDocumentsToCloud|AutomaticSpellingCorrection|NewWindowTarget|FXDefaultSearchScope|DoNotOfferNewDisksForBackup|ShouldUseSmartLinks|EnableAutomaticListInsertion' "$T"/Preferences/*.plist "$T"/Preferences/.GlobalPreferences.plist 2>/dev/null; then echo "STILL PRESENT"; else echo "ok: none"; fi
+```
+
+A key can show `STILL SET` if you changed that option yourself afterwards in System Preferences or Finder; check whether the value is one you chose.
+
+If you skipped the Dock step, `defaults read com.apple.dock dashboard-in-overlay` still prints `1`. To drop that one key and keep your Dock layout:
+
+```
+defaults delete com.apple.dock dashboard-in-overlay && killall Dock
+sudo defaults delete "/System/Library/User Template/Non_localized/Library/Preferences/com.apple.dock" dashboard-in-overlay
+```
+
 ## If an app is blocked afterwards
 
 With Gatekeeper on, some newer apps may be refused on 10.9. Right-click the app and choose Open, or run:
